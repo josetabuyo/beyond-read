@@ -75,7 +75,7 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
 
   return (
     <main className={styles.stage}>
-      <RelayVideoBackground relayUrl={relayVideoUrl} liveStream={camera.stream} />
+      <RelayVideoBackground relayUrl={relayVideoUrl} />
 
       {(phase === "reading" || phase === "uploading") && (
         <KaraokeText poem={poem} currentIndex={karaoke.index} />
