@@ -1,0 +1,52 @@
+.page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1.5rem, 4vh, 3rem);
+  padding: 2rem 1.25rem;
+  text-align: center;
+}
+
+.kicker {
+  font-size: 0.8rem;
+  letter-spacing: 0.32em;
+  text-transform: lowercase;
+  color: var(--dim);
+}
+
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.75rem, 2.5vh, 1.5rem);
+}
+
+.title {
+  display: inline-block;
+  font-size: clamp(1.8rem, 6vw, 3.2rem);
+  font-weight: 500;
+  font-style: italic;
+  color: var(--ink-past);
+  filter: blur(1.4px);
+  letter-spacing: 0.01em;
+  transition:
+    color 320ms ease-out,
+    filter 320ms ease-out,
+    text-shadow 400ms ease-out;
+}
+
+.title:hover,
+.title:focus-visible {
+  color: var(--ink);
+  filter: blur(0);
+  text-shadow: 0 0 26px rgba(242, 239, 230, 0.3);
+  outline: none;
+}
+
+.hint {
+  font-size: 0.85rem;
+  color: var(--dim);
+  max-width: 28ch;
+}

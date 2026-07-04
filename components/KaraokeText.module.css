@@ -1,0 +1,44 @@
+.column {
+  position: relative;
+  z-index: 3;
+  max-width: 34ch;
+  max-height: 70dvh;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 2rem 1rem;
+}
+
+.column::-webkit-scrollbar {
+  display: none;
+}
+
+.line {
+  font-size: clamp(1.4rem, 3.2vw, 2.2rem);
+  line-height: 1.9;
+  font-style: italic;
+  text-align: center;
+}
+
+.word {
+  display: inline-block;
+  transition:
+    color 240ms ease-out,
+    filter 240ms ease-out,
+    text-shadow 320ms ease-out;
+}
+
+.future {
+  color: var(--dim);
+  filter: blur(1.6px);
+}
+
+.past {
+  color: var(--ink-past);
+  filter: blur(0.7px);
+}
+
+.current {
+  color: var(--ink);
+  filter: blur(0);
+  text-shadow: 0 0 26px rgba(242, 239, 230, 0.35);
+}

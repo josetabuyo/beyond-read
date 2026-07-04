@@ -1,0 +1,77 @@
+.stage {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+.beginButton {
+  font-family: inherit;
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-style: italic;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  padding: 0.6em 1.4em;
+  border: 1px solid var(--dim);
+  border-radius: 999px;
+  transition:
+    border-color 240ms ease-out,
+    text-shadow 320ms ease-out;
+}
+
+.beginButton:hover,
+.beginButton:focus-visible {
+  border-color: var(--ink);
+  text-shadow: 0 0 26px rgba(242, 239, 230, 0.35);
+  outline: none;
+}
+
+.overlayText {
+  font-size: 1.1rem;
+  font-style: italic;
+  color: var(--ink-past);
+}
+
+.backLink {
+  font-size: 0.9rem;
+  color: var(--dim);
+  border-bottom: 1px solid var(--dim);
+}
+
+.hint {
+  position: fixed;
+  z-index: 4;
+  bottom: 1.5rem;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  opacity: 0.3;
+  animation: fade-hint 4400ms ease forwards;
+}
+
+@keyframes fade-hint {
+  0% {
+    opacity: 0.3;
+  }
+  80% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0;
+  }
+}
