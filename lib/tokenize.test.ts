@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
-import fs from "node:fs";
-import path from "node:path";
 import { tokenizePoem } from "./tokenize";
+import { getPoems, getPoem } from "./poems";
 
 describe("tokenizePoem", () => {
   it("extracts the title from the first line", () => {
@@ -32,15 +31,21 @@ describe("tokenizePoem", () => {
     expect(last.isStanzaEnd).toBe(false);
   });
 
-  it("parses the real poem files without throwing and assigns sequential indices", () => {
-    const poemsDir = path.join(process.cwd(), "poems");
-    for (const file of fs.readdirSync(poemsDir)) {
-      if (!file.endsWith(".txt")) continue;
-      const raw = fs.readFileSync(path.join(poemsDir, file), "utf-8");
-      const poem = tokenizePoem(file, raw);
+  it("parses the real poem files (across all category folders) without throwing and assigns sequential indices", () => {
+    const summaries = getPoems();
+    expect(summaries.length).toBeGreaterThan(0);
+    for (const { id } of summaries) {
+      const poem = getPoem(id);
       expect(poem.title.length).toBeGreaterThan(0);
       expect(poem.words.length).toBeGreaterThan(0);
       poem.words.forEach((w, i) => expect(w.index).toBe(i));
     }
+  });
+
+  it("covers all four length categories", () => {
+    const categories = new Set(getPoems().map((p) => p.category));
+    expect(categories).toEqual(
+      new Set(["super-corto", "corto", "mediano", "largo"]),
+    );
   });
 });
