@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Poem } from "@/lib/tokenize";
+import { buildTimeline } from "@/lib/timing";
 import { useCamera } from "./hooks/useCamera";
 import { useRecorder } from "./hooks/useRecorder";
 import { useKaraoke } from "./hooks/useKaraoke";
@@ -10,29 +11,70 @@ import KaraokeText from "./KaraokeText";
 import RelayVideoBackground from "./RelayVideoBackground";
 import styles from "./ReaderStage.module.css";
 
-type Phase = "begin" | "requesting-camera" | "reading" | "uploading" | "error";
+type Phase = "loading" | "reading" | "uploading" | "error";
 
-const BEAT_MS = 1500;
+const TEXT_START_DELAY_MS = 1400;
 
 export default function ReaderStage({ poem }: { poem: Poem }) {
   const router = useRouter();
-  const [phase, setPhase] = useState<Phase>("begin");
+  const [phase, setPhase] = useState<Phase>("loading");
   const [relayVideoUrl, setRelayVideoUrl] = useState<string | null>(null);
+  const [videoReady, setVideoReady] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [textActive, setTextActive] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+
   const finishedRef = useRef(false);
+  const startedRef = useRef(false);
 
   const camera = useCamera();
   const recorder = useRecorder();
 
+  const timeline = useMemo(() => buildTimeline(poem.words), [poem.words]);
+
+  // Kick off camera permission and relay-video claim in parallel, as soon as the page mounts.
   useEffect(() => {
+    let cancelled = false;
+
+    camera.start().then((stream) => {
+      if (!cancelled && !stream) setPhase("error");
+    });
+
     fetch("/api/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ poemId: poem.id }),
     })
       .then((res) => (res.ok ? res.json() : { relayVideoUrl: null }))
-      .then((data) => setRelayVideoUrl(data.relayVideoUrl ?? null))
-      .catch(() => setRelayVideoUrl(null));
+      .then((data) => {
+        if (!cancelled) setRelayVideoUrl(data.relayVideoUrl ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setRelayVideoUrl(null);
+      });
+
+    return () => {
+      cancelled = true;
+      if (!finishedRef.current) camera.stop();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [poem.id]);
+
+  const onVideoReady = useCallback(() => setVideoReady(true), []);
+
+  // Once the camera stream and the relay video (if any) are both fully ready,
+  // start recording and reveal the background — no rush, everything is buffered first.
+  useEffect(() => {
+    if (startedRef.current) return;
+    if (phase !== "loading") return;
+    if (!camera.stream || !videoReady) return;
+
+    startedRef.current = true;
+    recorder.start(camera.stream);
+    setPhase("reading");
+    setRevealed(true);
+    window.setTimeout(() => setTextActive(true), TEXT_START_DELAY_MS);
+  }, [camera.stream, videoReady, phase, recorder]);
 
   const finishReading = useCallback(async () => {
     if (finishedRef.current) return;
@@ -60,38 +102,34 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
     router.push("/");
   }, [camera, poem.id, recorder, router]);
 
-  const karaoke = useKaraoke(poem.words, phase === "reading", finishReading);
+  const karaoke = useKaraoke(poem.words, textActive, finishReading);
 
-  const begin = useCallback(async () => {
-    setPhase("requesting-camera");
-    const stream = await camera.start();
-    if (!stream) {
-      setPhase("error");
-      return;
+  // Start fading to black as soon as the last word lights up, so the relay
+  // video never lingers frozen on a paused face once the reading ends.
+  useEffect(() => {
+    if (textActive && karaoke.index >= poem.words.length - 1) {
+      setFinishing(true);
     }
-    recorder.start(stream);
-    window.setTimeout(() => setPhase("reading"), BEAT_MS);
-  }, [camera, recorder]);
+  }, [textActive, karaoke.index, poem.words.length]);
+
+  const wordFraction =
+    timeline.total > 0 ? timeline.starts[karaoke.index] / timeline.total : 0;
 
   return (
     <main className={styles.stage}>
-      <RelayVideoBackground relayUrl={relayVideoUrl} />
+      <RelayVideoBackground
+        relayUrl={relayVideoUrl}
+        wordFraction={wordFraction}
+        totalReadingMs={timeline.total}
+        mode={karaoke.mode}
+        revealed={revealed}
+        fading={finishing}
+        onReady={onVideoReady}
+      />
 
-      {(phase === "reading" || phase === "uploading") && (
-        <KaraokeText poem={poem} currentIndex={karaoke.index} />
-      )}
-
-      {phase === "begin" && (
-        <div className={styles.overlay}>
-          <button className={styles.beginButton} onClick={begin}>
-            comenzar
-          </button>
-        </div>
-      )}
-
-      {phase === "requesting-camera" && (
-        <div className={styles.overlay}>
-          <p className={styles.overlayText}>activando cámara…</p>
+      {textActive && (
+        <div className={`${styles.textLayer} ${finishing ? styles.textFading : ""}`}>
+          <KaraokeText poem={poem} currentIndex={karaoke.index} />
         </div>
       )}
 
@@ -110,7 +148,7 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
         </div>
       )}
 
-      {phase === "reading" && (
+      {textActive && !finishing && (
         <p className={styles.hint}>← → navegar · espacio pausar / seguir</p>
       )}
     </main>

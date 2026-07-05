@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PoemWord } from "@/lib/tokenize";
-import { wordDuration } from "@/lib/timing";
+import { scheduledWordDuration } from "@/lib/timing";
 
 export type KaraokeMode = "auto" | "manual";
 
@@ -47,7 +47,9 @@ export function useKaraoke(
           setIndex((prev) => prev + 1);
         }
       },
-      isLast ? wordDuration(words[i]) + 900 : wordDuration(words[i]),
+      isLast
+        ? scheduledWordDuration(words[i], i) + 900
+        : scheduledWordDuration(words[i], i),
     );
 
     return clearTimer;

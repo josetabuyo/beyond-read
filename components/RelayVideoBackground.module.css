@@ -13,6 +13,17 @@
   object-fit: cover;
   z-index: 0;
   filter: grayscale(0.35) brightness(0.55) contrast(0.95);
+  opacity: 0;
+  transition: opacity 1400ms ease;
+}
+
+.relay.revealed {
+  opacity: 1;
+}
+
+.relay.faded {
+  opacity: 0;
+  transition: opacity 1100ms ease;
 }
 
 .scrim {

@@ -6,6 +6,17 @@
   justify-content: center;
 }
 
+.textLayer {
+  position: relative;
+  z-index: 3;
+  opacity: 1;
+  transition: opacity 1100ms ease;
+}
+
+.textFading {
+  opacity: 0;
+}
+
 .overlay {
   position: relative;
   z-index: 4;
@@ -15,27 +26,6 @@
   gap: 1.25rem;
   text-align: center;
   padding: 2rem;
-}
-
-.beginButton {
-  font-family: inherit;
-  font-size: clamp(1.4rem, 3vw, 2rem);
-  font-style: italic;
-  letter-spacing: 0.06em;
-  color: var(--ink);
-  padding: 0.6em 1.4em;
-  border: 1px solid var(--dim);
-  border-radius: 999px;
-  transition:
-    border-color 240ms ease-out,
-    text-shadow 320ms ease-out;
-}
-
-.beginButton:hover,
-.beginButton:focus-visible {
-  border-color: var(--ink);
-  text-shadow: 0 0 26px rgba(242, 239, 230, 0.35);
-  outline: none;
 }
 
 .overlayText {
