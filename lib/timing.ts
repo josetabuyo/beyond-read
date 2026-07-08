@@ -10,6 +10,14 @@ export const AUTO_PACE_MULTIPLIER = 1.15;
 export const STARTUP_RAMP_WORDS: number = 5;
 const STARTUP_RAMP_START_FACTOR = 1.7;
 
+/**
+ * How long after reveal the karaoke text starts ticking through words. The
+ * relay video, though, starts playing as soon as it's revealed — before this
+ * delay elapses — so anything budgeting the video's playback rate against the
+ * reading's duration must include this head start too.
+ */
+export const TEXT_START_DELAY_MS = 1400;
+
 /** The relay video settles at a third of its normal speed once the last word is reached. */
 export const ENDING_SLOWDOWN_FACTOR = 3;
 

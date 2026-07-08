@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, cleanup } from "@testing-library/react";
+import { render, cleanup, act } from "@testing-library/react";
 import RelayVideoBackground from "./RelayVideoBackground";
+import styles from "./RelayVideoBackground.module.css";
+import { ENDING_HOLD_MS, ENDING_SLOWDOWN_FACTOR, TEXT_START_DELAY_MS } from "@/lib/timing";
 
 function mockVideoDuration(video: HTMLVideoElement, duration: number) {
   Object.defineProperty(video, "duration", { value: duration, configurable: true });
@@ -39,6 +41,7 @@ describe("RelayVideoBackground", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it("never reseeks the video across word ticks while in auto mode (regression: this caused a visible stutter)", () => {
@@ -62,7 +65,8 @@ describe("RelayVideoBackground", () => {
     expect(video.pause).not.toHaveBeenCalled();
   });
 
-  it("seeks the video to the matching position on every manual navigation", () => {
+  it("veils a manual navigation jump behind a brief blur before seeking, then lifts it", () => {
+    vi.useFakeTimers();
     const { container, rerender } = render(
       <RelayVideoBackground {...baseProps} wordFraction={0} mode="manual" />,
     );
@@ -73,7 +77,45 @@ describe("RelayVideoBackground", () => {
     const assignments = trackCurrentTimeAssignments(video);
 
     rerender(<RelayVideoBackground {...baseProps} wordFraction={0.5} mode="manual" />);
+
+    // The jump is deferred behind the veil, not applied immediately.
+    expect(assignments).toEqual([]);
+    expect(video.className).toContain(styles.seeking);
+
+    act(() => {
+      vi.advanceTimersByTime(220);
+    });
+    expect(assignments).toEqual([10]);
+    // Still veiled while the frame settles, then lifts.
+    expect(video.className).toContain(styles.seeking);
+
+    act(() => {
+      vi.advanceTimersByTime(220);
+    });
+    expect(video.className).not.toContain(styles.seeking);
+
+    expect(video.pause).toHaveBeenCalled();
+  });
+
+  it("seeks the video to the matching position on every manual navigation, once the veil settles", () => {
+    vi.useFakeTimers();
+    const { container, rerender } = render(
+      <RelayVideoBackground {...baseProps} wordFraction={0} mode="manual" />,
+    );
+    const video = container.querySelector("video")!;
+    mockVideoDuration(video, 20);
+    video.dispatchEvent(new Event("loadedmetadata"));
+
+    const assignments = trackCurrentTimeAssignments(video);
+
+    rerender(<RelayVideoBackground {...baseProps} wordFraction={0.5} mode="manual" />);
+    act(() => {
+      vi.advanceTimersByTime(440);
+    });
     rerender(<RelayVideoBackground {...baseProps} wordFraction={0.25} mode="manual" />);
+    act(() => {
+      vi.advanceTimersByTime(440);
+    });
 
     expect(assignments).toEqual([10, 5]);
     expect(video.pause).toHaveBeenCalled();
@@ -116,6 +158,30 @@ describe("RelayVideoBackground", () => {
 
     expect(video.playbackRate).toBeCloseTo(fullSpeedRate / 3);
   });
+
+  it(
+    "reserves a tail of footage for the closing slow motion instead of exhausting " +
+      "the video at regular pace (regression: this caused the ending to freeze on the last frame)",
+    () => {
+      const { container, rerender } = render(
+        <RelayVideoBackground {...baseProps} wordFraction={0} mode="auto" />,
+      );
+      const video = container.querySelector("video")!;
+      mockVideoDuration(video, 20);
+      video.dispatchEvent(new Event("loadedmetadata"));
+
+      // Flush the duration/rate state updates the event listener queued.
+      rerender(<RelayVideoBackground {...baseProps} wordFraction={0} mode="auto" />);
+
+      const naiveRate = (20 * 1000) / baseProps.totalReadingMs;
+      const effectiveTotalMs =
+        TEXT_START_DELAY_MS + baseProps.totalReadingMs + ENDING_HOLD_MS / ENDING_SLOWDOWN_FACTOR;
+      const reservedRate = (20 * 1000) / effectiveTotalMs;
+
+      expect(video.playbackRate).toBeCloseTo(reservedRate);
+      expect(video.playbackRate).toBeLessThan(naiveRate);
+    },
+  );
 
   it("does not render a video element (or block on preload) when there is no relay video yet", () => {
     const onReady = vi.fn();

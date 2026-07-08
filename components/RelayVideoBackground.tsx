@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ENDING_HOLD_MS, ENDING_SLOWDOWN_FACTOR, TEXT_START_DELAY_MS } from "@/lib/timing";
 import styles from "./RelayVideoBackground.module.css";
 
 const READY_TIMEOUT_MS = 6000;
 const MIN_PLAYBACK_RATE = 0.4;
 const MAX_PLAYBACK_RATE = 2.5;
 const RESEEK_THRESHOLD_S = 0.12;
+// How long the video visually dips (blurs) to mask a manual-navigation jump cut.
+const SEEK_VEIL_MS = 220;
 // MediaRecorder-produced webm often reports duration as Infinity until the
 // browser is forced to compute it — a well-known Chromium quirk. Seeking far
 // past the end triggers a real duration to be resolved via `durationchange`.
@@ -38,6 +41,8 @@ export default function RelayVideoBackground({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
   const [playbackRate, setPlaybackRate] = useState<number | null>(null);
+  const [seeking, setSeeking] = useState(false);
+  const seekVeilTimeoutRef = useRef<number | null>(null);
 
   // No relay video to preload (first reader of this poem) — proceed immediately.
   useEffect(() => {
@@ -107,10 +112,18 @@ export default function RelayVideoBackground({
     };
   }, [relayUrl]);
 
-  // Stretch or compress the relay video so its full length spans this reading's duration.
+  // Stretch or compress the relay video so its full length spans this
+  // reading's duration — but reserve a tail of footage for the closing slow
+  // motion, and account for the video already playing for TEXT_START_DELAY_MS
+  // before the word-by-word timeline even starts. Without both, the
+  // regular-pace rate would consume the entire video by the time the last
+  // word arrives, leaving nothing to play during the hold: it would just
+  // freeze on the final frame instead of easing into slow motion.
   useEffect(() => {
     if (duration === null || totalReadingMs <= 0) return;
-    const rate = (duration * 1000) / totalReadingMs;
+    const effectiveTotalMs =
+      TEXT_START_DELAY_MS + totalReadingMs + ENDING_HOLD_MS / ENDING_SLOWDOWN_FACTOR;
+    const rate = (duration * 1000) / effectiveTotalMs;
     setPlaybackRate(Math.min(MAX_PLAYBACK_RATE, Math.max(MIN_PLAYBACK_RATE, rate)));
   }, [duration, totalReadingMs]);
 
@@ -140,15 +153,28 @@ export default function RelayVideoBackground({
   }, [mode, duration, revealed, fading]);
 
   // Manual navigation scrubs the video to the position corresponding to the
-  // word the reader just jumped to.
+  // word the reader just jumped to. That's a hard cut in the footage, which
+  // reads as a glitch against the piece's otherwise smooth pacing — so the
+  // jump itself happens hidden behind a brief blur veil, which then lifts to
+  // reveal the new frame, instead of a visible splice.
   useEffect(() => {
     const video = videoRef.current;
     if (!video || duration === null || mode !== "manual") return;
 
     const target = wordFraction * duration;
-    if (Math.abs(video.currentTime - target) > RESEEK_THRESHOLD_S) {
+    if (Math.abs(video.currentTime - target) <= RESEEK_THRESHOLD_S) return;
+
+    if (seekVeilTimeoutRef.current) window.clearTimeout(seekVeilTimeoutRef.current);
+    setSeeking(true);
+
+    seekVeilTimeoutRef.current = window.setTimeout(() => {
       video.currentTime = target;
-    }
+      seekVeilTimeoutRef.current = window.setTimeout(() => setSeeking(false), SEEK_VEIL_MS);
+    }, SEEK_VEIL_MS);
+
+    return () => {
+      if (seekVeilTimeoutRef.current) window.clearTimeout(seekVeilTimeoutRef.current);
+    };
   }, [wordFraction, mode, duration]);
 
   return (
@@ -158,7 +184,7 @@ export default function RelayVideoBackground({
           ref={videoRef}
           className={`${styles.relay} ${revealed ? styles.revealed : ""} ${
             fading ? styles.faded : ""
-          }`}
+          } ${seeking ? styles.seeking : ""}`}
           src={relayUrl}
           preload="auto"
           muted

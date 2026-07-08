@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Poem } from "@/lib/tokenize";
-import { buildTimeline, finalWordSlowdownFactor } from "@/lib/timing";
+import { buildTimeline, finalWordSlowdownFactor, TEXT_START_DELAY_MS } from "@/lib/timing";
 import { useCamera } from "./hooks/useCamera";
 import { useRecorder } from "./hooks/useRecorder";
 import { useKaraoke } from "./hooks/useKaraoke";
@@ -12,8 +12,6 @@ import RelayVideoBackground from "./RelayVideoBackground";
 import styles from "./ReaderStage.module.css";
 
 type Phase = "loading" | "reading" | "uploading" | "error";
-
-const TEXT_START_DELAY_MS = 1400;
 
 export default function ReaderStage({ poem }: { poem: Poem }) {
   const router = useRouter();

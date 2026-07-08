@@ -14,7 +14,9 @@
   z-index: 0;
   filter: grayscale(0.35) brightness(0.55) contrast(0.95);
   opacity: 0;
-  transition: opacity 1400ms ease;
+  transition:
+    opacity 1400ms ease,
+    filter 220ms ease;
 }
 
 .relay.revealed {
@@ -24,7 +26,15 @@
 .relay.faded {
   opacity: 0;
   /* Matches lib/timing.ts ENDING_HOLD_MS — the slow-motion tail and the fade finish together. */
-  transition: opacity 5000ms ease;
+  transition:
+    opacity 5000ms ease,
+    filter 220ms ease;
+}
+
+/* Veils a manual-navigation jump cut in the footage — blurs in just before
+   the seek lands, then lifts, so the splice never reads as a visible cut. */
+.relay.seeking {
+  filter: grayscale(0.35) brightness(0.25) contrast(0.95) blur(22px);
 }
 
 .scrim {
