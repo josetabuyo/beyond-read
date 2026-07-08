@@ -19,6 +19,7 @@ export default function RelayVideoBackground({
   mode,
   revealed,
   fading,
+  endingSlowFactor = 1,
   onReady,
 }: {
   relayUrl: string | null;
@@ -30,6 +31,8 @@ export default function RelayVideoBackground({
   revealed: boolean;
   /** Once true, the relay video fades back out to black. */
   fading: boolean;
+  /** Divides the playback rate as the reading nears its final words, easing into slow motion for the farewell. */
+  endingSlowFactor?: number;
   onReady: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -111,10 +114,15 @@ export default function RelayVideoBackground({
     setPlaybackRate(Math.min(MAX_PLAYBACK_RATE, Math.max(MIN_PLAYBACK_RATE, rate)));
   }, [duration, totalReadingMs]);
 
+  // As the reading nears its final words, endingSlowFactor eases from 1 up to
+  // ENDING_SLOWDOWN_FACTOR — a smooth deceleration into slow motion rather
+  // than a jump, since this only ever adjusts the rate, never seeks.
   useEffect(() => {
     const video = videoRef.current;
-    if (video && playbackRate !== null) video.playbackRate = playbackRate;
-  }, [playbackRate]);
+    if (video && playbackRate !== null) {
+      video.playbackRate = playbackRate / endingSlowFactor;
+    }
+  }, [playbackRate, endingSlowFactor]);
 
   // Auto mode plays continuously at the stretched/compressed rate — no
   // per-word reseeking, which was causing a visible stutter/jump on every

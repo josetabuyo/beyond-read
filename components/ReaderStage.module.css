@@ -10,7 +10,7 @@
   position: relative;
   z-index: 3;
   opacity: 1;
-  transition: opacity 1100ms ease;
+  transition: opacity 1700ms ease;
 }
 
 .textFading {

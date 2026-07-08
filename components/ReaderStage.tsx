@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Poem } from "@/lib/tokenize";
-import { buildTimeline } from "@/lib/timing";
+import { buildTimeline, endingRampFactor } from "@/lib/timing";
 import { useCamera } from "./hooks/useCamera";
 import { useRecorder } from "./hooks/useRecorder";
 import { useKaraoke } from "./hooks/useKaraoke";
@@ -14,6 +14,10 @@ import styles from "./ReaderStage.module.css";
 type Phase = "loading" | "reading" | "uploading" | "error";
 
 const TEXT_START_DELAY_MS = 1400;
+// Matches the CSS opacity transition on the relay video / text layers, plus a
+// small buffer — guarantees we never navigate away mid-fade, however fast the
+// recording upload resolves.
+const FADE_HOLD_MS = 1800;
 
 export default function ReaderStage({ poem }: { poem: Poem }) {
   const router = useRouter();
@@ -81,7 +85,8 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
     finishedRef.current = true;
 
     setPhase("uploading");
-    const blob = await recorder.stop();
+    const holdUntilBlack = new Promise((resolve) => setTimeout(resolve, FADE_HOLD_MS));
+    const [blob] = await Promise.all([recorder.stop(), holdUntilBlack]);
     camera.stop();
 
     if (blob) {
@@ -114,6 +119,8 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
 
   const wordFraction =
     timeline.total > 0 ? timeline.starts[karaoke.index] / timeline.total : 0;
+  const endingSlowFactor =
+    poem.words.length > 0 ? endingRampFactor(karaoke.index, poem.words.length) : 1;
 
   return (
     <main className={styles.stage}>
@@ -124,6 +131,7 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
         mode={karaoke.mode}
         revealed={revealed}
         fading={finishing}
+        endingSlowFactor={endingSlowFactor}
         onReady={onVideoReady}
       />
 

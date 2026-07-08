@@ -23,7 +23,7 @@
 
 .relay.faded {
   opacity: 0;
-  transition: opacity 1100ms ease;
+  transition: opacity 1700ms ease;
 }
 
 .scrim {

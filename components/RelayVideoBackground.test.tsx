@@ -94,6 +94,29 @@ describe("RelayVideoBackground", () => {
     expect(video.play).toHaveBeenCalled();
   });
 
+  it("divides the playback rate by endingSlowFactor for a cinematic slow motion near the close", () => {
+    const { container, rerender } = render(
+      <RelayVideoBackground {...baseProps} wordFraction={0.9} mode="auto" endingSlowFactor={1} />,
+    );
+    const video = container.querySelector("video")!;
+    mockVideoDuration(video, 20);
+    video.dispatchEvent(new Event("loadedmetadata"));
+
+    // Flush the duration/rate state updates the event listener queued.
+    rerender(
+      <RelayVideoBackground {...baseProps} wordFraction={0.9} mode="auto" endingSlowFactor={1} />,
+    );
+
+    const fullSpeedRate = video.playbackRate;
+    expect(fullSpeedRate).toBeGreaterThan(0);
+
+    rerender(
+      <RelayVideoBackground {...baseProps} wordFraction={0.95} mode="auto" endingSlowFactor={3} />,
+    );
+
+    expect(video.playbackRate).toBeCloseTo(fullSpeedRate / 3);
+  });
+
   it("does not render a video element (or block on preload) when there is no relay video yet", () => {
     const onReady = vi.fn();
     const { container } = render(

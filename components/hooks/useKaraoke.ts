@@ -48,8 +48,8 @@ export function useKaraoke(
         }
       },
       isLast
-        ? scheduledWordDuration(words[i], i) + 900
-        : scheduledWordDuration(words[i], i),
+        ? scheduledWordDuration(words[i], i, words.length) + 900
+        : scheduledWordDuration(words[i], i, words.length),
     );
 
     return clearTimer;
