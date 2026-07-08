@@ -2,12 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   wordDuration,
   startupRampFactor,
-  endingRampFactor,
+  isFinalWord,
+  finalWordSlowdownFactor,
   scheduledWordDuration,
   buildTimeline,
   AUTO_PACE_MULTIPLIER,
   STARTUP_RAMP_WORDS,
-  ENDING_RAMP_WORDS,
   ENDING_SLOWDOWN_FACTOR,
 } from "./timing";
 import type { PoemWord } from "./tokenize";
@@ -99,29 +99,29 @@ describe("startupRampFactor", () => {
   });
 });
 
-describe("endingRampFactor", () => {
-  const totalWords = 100;
+describe("isFinalWord", () => {
+  const totalWords = 20;
 
-  it("stays at 1 far from the end", () => {
-    expect(endingRampFactor(0, totalWords)).toBe(1);
-    expect(endingRampFactor(totalWords - ENDING_RAMP_WORDS - 1, totalWords)).toBe(1);
+  it("is false for every word before the last", () => {
+    expect(isFinalWord(0, totalWords)).toBe(false);
+    expect(isFinalWord(totalWords - 2, totalWords)).toBe(false);
   });
 
-  it("reaches the full slowdown factor at the very last word", () => {
-    expect(endingRampFactor(totalWords - 1, totalWords)).toBe(ENDING_SLOWDOWN_FACTOR);
+  it("is true only at the last word", () => {
+    expect(isFinalWord(totalWords - 1, totalWords)).toBe(true);
+  });
+});
+
+describe("finalWordSlowdownFactor", () => {
+  const totalWords = 20;
+
+  it("stays at 1 for every word before the last — no early ramp", () => {
+    expect(finalWordSlowdownFactor(0, totalWords)).toBe(1);
+    expect(finalWordSlowdownFactor(totalWords - 2, totalWords)).toBe(1);
   });
 
-  it("increases monotonically across the ramp", () => {
-    const values = Array.from({ length: ENDING_RAMP_WORDS }, (_, i) =>
-      endingRampFactor(totalWords - ENDING_RAMP_WORDS + i, totalWords),
-    );
-    for (let i = 1; i < values.length; i++) {
-      expect(values[i]).toBeGreaterThan(values[i - 1]);
-    }
-  });
-
-  it("defaults to no slowdown when totalWords is omitted", () => {
-    expect(endingRampFactor(4, Infinity)).toBe(1);
+  it("jumps straight to the full slowdown factor at the last word", () => {
+    expect(finalWordSlowdownFactor(totalWords - 1, totalWords)).toBe(ENDING_SLOWDOWN_FACTOR);
   });
 });
 
@@ -139,17 +139,7 @@ describe("scheduledWordDuration", () => {
     expect(scheduledWordDuration(w, STARTUP_RAMP_WORDS)).toBe(wordDuration(w));
   });
 
-  it("stretches the final words toward the ending slowdown factor", () => {
-    const w = word({ text: "casa" });
-    const totalWords = 50;
-    const lastIndex = totalWords - 1;
-    const scheduled = scheduledWordDuration(w, lastIndex, totalWords);
-    const base = wordDuration(w);
-    expect(scheduled).toBe(Math.round(base * ENDING_SLOWDOWN_FACTOR));
-    expect(scheduled).toBeGreaterThan(base);
-  });
-
-  it("does not apply the ending ramp when totalWords is omitted", () => {
+  it("stays at the regular pace for the last word too — the hold, not the duration, carries the slowdown", () => {
     const w = word({ text: "casa" });
     expect(scheduledWordDuration(w, STARTUP_RAMP_WORDS)).toBe(wordDuration(w));
   });
@@ -169,13 +159,12 @@ describe("buildTimeline", () => {
       word({ text: "tres", index: 2 }),
     ];
     const timeline = buildTimeline(words);
-    const n = words.length;
-    expect(timeline.starts[1]).toBe(scheduledWordDuration(words[0], 0, n));
+    expect(timeline.starts[1]).toBe(scheduledWordDuration(words[0], 0));
     expect(timeline.starts[2]).toBe(
-      scheduledWordDuration(words[0], 0, n) + scheduledWordDuration(words[1], 1, n),
+      scheduledWordDuration(words[0], 0) + scheduledWordDuration(words[1], 1),
     );
     expect(timeline.total).toBe(
-      timeline.starts[2] + scheduledWordDuration(words[2], 2, n),
+      timeline.starts[2] + scheduledWordDuration(words[2], 2),
     );
   });
 

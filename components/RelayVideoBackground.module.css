@@ -23,7 +23,8 @@
 
 .relay.faded {
   opacity: 0;
-  transition: opacity 1700ms ease;
+  /* Matches lib/timing.ts ENDING_HOLD_MS — the slow-motion tail and the fade finish together. */
+  transition: opacity 5000ms ease;
 }
 
 .scrim {

@@ -31,7 +31,7 @@ export default function RelayVideoBackground({
   revealed: boolean;
   /** Once true, the relay video fades back out to black. */
   fading: boolean;
-  /** Divides the playback rate as the reading nears its final words, easing into slow motion for the farewell. */
+  /** Divides the playback rate — 1 at regular pace, jumps to ENDING_SLOWDOWN_FACTOR the instant the last word is reached. */
   endingSlowFactor?: number;
   onReady: () => void;
 }) {
@@ -114,9 +114,10 @@ export default function RelayVideoBackground({
     setPlaybackRate(Math.min(MAX_PLAYBACK_RATE, Math.max(MIN_PLAYBACK_RATE, rate)));
   }, [duration, totalReadingMs]);
 
-  // As the reading nears its final words, endingSlowFactor eases from 1 up to
-  // ENDING_SLOWDOWN_FACTOR — a smooth deceleration into slow motion rather
-  // than a jump, since this only ever adjusts the rate, never seeks.
+  // endingSlowFactor is 1 at every regular pace and jumps straight to
+  // ENDING_SLOWDOWN_FACTOR the instant the last word is reached — a hard cut
+  // into slow motion for the closing tail, never a gradual ramp. This only
+  // ever adjusts the rate, never seeks, so it never reintroduces the stutter.
   useEffect(() => {
     const video = videoRef.current;
     if (video && playbackRate !== null) {

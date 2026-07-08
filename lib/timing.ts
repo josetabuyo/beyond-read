@@ -10,10 +10,15 @@ export const AUTO_PACE_MULTIPLIER = 1.15;
 export const STARTUP_RAMP_WORDS: number = 5;
 const STARTUP_RAMP_START_FACTOR = 1.7;
 
-/** How many words at the end of a reading ease down into the closing slow motion. */
-export const ENDING_RAMP_WORDS: number = 6;
-/** The reading (and relay video) settles at a third of its normal speed by the last word. */
+/** The relay video settles at a third of its normal speed once the last word is reached. */
 export const ENDING_SLOWDOWN_FACTOR = 3;
+
+/**
+ * How long the reading holds on the last word before finishing — matches the
+ * CSS fade-out duration so the slow-motion tail and the fade to black finish
+ * together, instead of cutting away mid-fade.
+ */
+export const ENDING_HOLD_MS = 5000;
 
 function lettersOnly(text: string): string {
   return text.replace(/[^\p{L}]/gu, "");
@@ -44,30 +49,26 @@ export function startupRampFactor(index: number): number {
 }
 
 /**
- * Multiplier easing the closing words of a reading from the regular rhythm
- * down to a cinematic slow motion, so the video and text settle into the
- * farewell instead of cutting away at full speed.
+ * Whether word `index` is the last of the reading — the sole trigger for the
+ * closing slow motion. The reading pace stays even right up to this point;
+ * only the last word holds, so the slow motion never bleeds into earlier words.
  */
-export function endingRampFactor(index: number, totalWords: number): number {
-  const remaining = totalWords - 1 - index;
-  if (remaining >= ENDING_RAMP_WORDS) return 1;
-  const t = (ENDING_RAMP_WORDS - Math.max(0, remaining)) / ENDING_RAMP_WORDS;
-  return 1 + (ENDING_SLOWDOWN_FACTOR - 1) * t;
+export function isFinalWord(index: number, totalWords: number): boolean {
+  return index >= totalWords - 1;
 }
 
 /**
- * The duration actually scheduled by the reading engine for word `index`.
- * `totalWords` is optional so callers that only care about the startup ramp
- * (e.g. isolated word timing) can omit it and skip the ending ramp entirely.
+ * The relay video's playback-rate divisor for word `index` — 1 at every
+ * regular pace, and ENDING_SLOWDOWN_FACTOR the instant the last word is
+ * reached (a hard cut into slow motion, not a ramp).
  */
-export function scheduledWordDuration(
-  word: PoemWord,
-  index: number,
-  totalWords: number = Infinity,
-): number {
-  return Math.round(
-    wordDuration(word) * startupRampFactor(index) * endingRampFactor(index, totalWords),
-  );
+export function finalWordSlowdownFactor(index: number, totalWords: number): number {
+  return isFinalWord(index, totalWords) ? ENDING_SLOWDOWN_FACTOR : 1;
+}
+
+/** The duration actually scheduled by the reading engine for word `index`. */
+export function scheduledWordDuration(word: PoemWord, index: number): number {
+  return Math.round(wordDuration(word) * startupRampFactor(index));
 }
 
 export interface WordTimeline {
@@ -82,7 +83,7 @@ export function buildTimeline(words: PoemWord[]): WordTimeline {
   let elapsed = 0;
   for (let i = 0; i < words.length; i++) {
     starts.push(elapsed);
-    elapsed += scheduledWordDuration(words[i], i, words.length);
+    elapsed += scheduledWordDuration(words[i], i);
   }
   return { starts, total: elapsed };
 }

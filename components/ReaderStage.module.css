@@ -10,7 +10,8 @@
   position: relative;
   z-index: 3;
   opacity: 1;
-  transition: opacity 1700ms ease;
+  /* Matches lib/timing.ts ENDING_HOLD_MS and the relay video's fade-out. */
+  transition: opacity 5000ms ease;
 }
 
 .textFading {

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Poem } from "@/lib/tokenize";
-import { buildTimeline, endingRampFactor } from "@/lib/timing";
+import { buildTimeline, finalWordSlowdownFactor } from "@/lib/timing";
 import { useCamera } from "./hooks/useCamera";
 import { useRecorder } from "./hooks/useRecorder";
 import { useKaraoke } from "./hooks/useKaraoke";
@@ -14,10 +14,6 @@ import styles from "./ReaderStage.module.css";
 type Phase = "loading" | "reading" | "uploading" | "error";
 
 const TEXT_START_DELAY_MS = 1400;
-// Matches the CSS opacity transition on the relay video / text layers, plus a
-// small buffer — guarantees we never navigate away mid-fade, however fast the
-// recording upload resolves.
-const FADE_HOLD_MS = 1800;
 
 export default function ReaderStage({ poem }: { poem: Poem }) {
   const router = useRouter();
@@ -30,6 +26,7 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
 
   const finishedRef = useRef(false);
   const startedRef = useRef(false);
+  const savePromiseRef = useRef<Promise<Blob | null> | null>(null);
 
   const camera = useCamera();
   const recorder = useRecorder();
@@ -80,14 +77,24 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
     window.setTimeout(() => setTextActive(true), TEXT_START_DELAY_MS);
   }, [camera.stream, videoReady, phase, recorder]);
 
+  // The reading holds on the last word for ENDING_HOLD_MS while the video
+  // eases into slow motion and the screen fades to black. Stopping the
+  // recorder and uploading right away — instead of waiting for that hold to
+  // elapse — spends the hold's time on the save, so there's nothing left to
+  // wait on once the fade actually completes.
+  const startSaving = useCallback(() => {
+    if (savePromiseRef.current) return;
+    setPhase("uploading");
+    savePromiseRef.current = recorder.stop();
+    camera.stop();
+  }, [camera, recorder]);
+
   const finishReading = useCallback(async () => {
     if (finishedRef.current) return;
     finishedRef.current = true;
 
-    setPhase("uploading");
-    const holdUntilBlack = new Promise((resolve) => setTimeout(resolve, FADE_HOLD_MS));
-    const [blob] = await Promise.all([recorder.stop(), holdUntilBlack]);
-    camera.stop();
+    startSaving();
+    const blob = await savePromiseRef.current;
 
     if (blob) {
       try {
@@ -105,22 +112,25 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
     }
 
     router.push("/");
-  }, [camera, poem.id, recorder, router]);
+  }, [poem.id, router, startSaving]);
 
   const karaoke = useKaraoke(poem.words, textActive, finishReading);
 
   // Start fading to black as soon as the last word lights up, so the relay
-  // video never lingers frozen on a paused face once the reading ends.
+  // video never lingers frozen on a paused face once the reading ends — and
+  // kick off the save immediately, so the upload runs during the fade
+  // instead of adding its own delay afterward.
   useEffect(() => {
     if (textActive && karaoke.index >= poem.words.length - 1) {
       setFinishing(true);
+      startSaving();
     }
-  }, [textActive, karaoke.index, poem.words.length]);
+  }, [textActive, karaoke.index, poem.words.length, startSaving]);
 
   const wordFraction =
     timeline.total > 0 ? timeline.starts[karaoke.index] / timeline.total : 0;
   const endingSlowFactor =
-    poem.words.length > 0 ? endingRampFactor(karaoke.index, poem.words.length) : 1;
+    poem.words.length > 0 ? finalWordSlowdownFactor(karaoke.index, poem.words.length) : 1;
 
   return (
     <main className={styles.stage}>
@@ -141,7 +151,7 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
         </div>
       )}
 
-      {phase === "uploading" && (
+      {phase === "uploading" && !finishing && (
         <div className={styles.overlay}>
           <p className={styles.overlayText}>guardando…</p>
         </div>
