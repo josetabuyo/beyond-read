@@ -116,25 +116,31 @@ export default function RelayVideoBackground({
     if (video && playbackRate !== null) video.playbackRate = playbackRate;
   }, [playbackRate]);
 
-  // Keep the video positioned at the point corresponding to the current word.
+  // Auto mode plays continuously at the stretched/compressed rate — no
+  // per-word reseeking, which was causing a visible stutter/jump on every
+  // word tick. Manual mode is the only thing that ever scrubs the video.
   useEffect(() => {
     const video = videoRef.current;
     if (!video || duration === null) return;
 
-    const target = wordFraction * duration;
-
     if (mode === "manual") {
       video.pause();
-      if (Math.abs(video.currentTime - target) > RESEEK_THRESHOLD_S) {
-        video.currentTime = target;
-      }
-    } else if (revealed && !fading) {
-      if (Math.abs(video.currentTime - target) > RESEEK_THRESHOLD_S) {
-        video.currentTime = target;
-      }
+    } else if (revealed && !fading && video.paused) {
       video.play().catch(() => undefined);
     }
-  }, [wordFraction, mode, duration, revealed, fading]);
+  }, [mode, duration, revealed, fading]);
+
+  // Manual navigation scrubs the video to the position corresponding to the
+  // word the reader just jumped to.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || duration === null || mode !== "manual") return;
+
+    const target = wordFraction * duration;
+    if (Math.abs(video.currentTime - target) > RESEEK_THRESHOLD_S) {
+      video.currentTime = target;
+    }
+  }, [wordFraction, mode, duration]);
 
   return (
     <div className={styles.stack}>
