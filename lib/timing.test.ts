@@ -6,9 +6,14 @@ import {
   finalWordSlowdownFactor,
   scheduledWordDuration,
   buildTimeline,
+  startupSlowdownFactor,
+  imageRevealDurationMs,
   AUTO_PACE_MULTIPLIER,
   STARTUP_RAMP_WORDS,
   ENDING_SLOWDOWN_FACTOR,
+  STARTUP_SLOWDOWN_FACTOR,
+  TEXT_START_DELAY_MS,
+  IMAGE_REVEAL_FRACTION,
 } from "./timing";
 import type { PoemWord } from "./tokenize";
 
@@ -122,6 +127,33 @@ describe("finalWordSlowdownFactor", () => {
 
   it("jumps straight to the full slowdown factor at the last word", () => {
     expect(finalWordSlowdownFactor(totalWords - 1, totalWords)).toBe(ENDING_SLOWDOWN_FACTOR);
+  });
+});
+
+describe("startupSlowdownFactor", () => {
+  it("starts at the full slowdown factor right at reveal — the opening mirror of the ending", () => {
+    expect(startupSlowdownFactor(0)).toBe(STARTUP_SLOWDOWN_FACTOR);
+  });
+
+  it("eases linearly down to 1 as the reading's start delay elapses", () => {
+    const half = startupSlowdownFactor(TEXT_START_DELAY_MS / 2);
+    expect(half).toBeCloseTo((STARTUP_SLOWDOWN_FACTOR + 1) / 2);
+  });
+
+  it("settles at 1 exactly when the reading starts ticking, and stays there", () => {
+    expect(startupSlowdownFactor(TEXT_START_DELAY_MS)).toBe(1);
+    expect(startupSlowdownFactor(TEXT_START_DELAY_MS + 5000)).toBe(1);
+  });
+});
+
+describe("imageRevealDurationMs", () => {
+  it("stretches the fade-in across IMAGE_REVEAL_FRACTION of the reading", () => {
+    expect(imageRevealDurationMs(90000)).toBe(90000 * IMAGE_REVEAL_FRACTION);
+  });
+
+  it("floors short poems at TEXT_START_DELAY_MS instead of an imperceptible flash", () => {
+    expect(imageRevealDurationMs(300)).toBe(TEXT_START_DELAY_MS);
+    expect(imageRevealDurationMs(0)).toBe(TEXT_START_DELAY_MS);
   });
 });
 

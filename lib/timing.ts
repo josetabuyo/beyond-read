@@ -28,6 +28,54 @@ export const ENDING_SLOWDOWN_FACTOR = 3;
  */
 export const ENDING_HOLD_MS = 5000;
 
+/**
+ * The opening mirror of ENDING_SLOWDOWN_FACTOR — the relay video starts at a
+ * third of its normal speed and eases up to full pace, instead of jumping
+ * straight into the regular rhythm.
+ */
+export const STARTUP_SLOWDOWN_FACTOR = 3;
+
+/**
+ * How long the transition veil takes to cover the menu once a poem is
+ * chosen, before navigating into the reading — slow enough to read as the
+ * menu itself dissolving away, not a cut.
+ */
+export const MENU_COVER_MS = 1800;
+
+/**
+ * How long the veil takes to lift once the relay video is revealed. Runs
+ * alongside the video's own fade-in (see RelayVideoBackground.module.css),
+ * so the two blend into a single soft reveal instead of two back-to-back fades.
+ */
+export const MENU_REVEAL_MS = 1800;
+
+/**
+ * How much of the reading the relay video's own opacity fade-in is stretched
+ * across — deliberately slow, so the reader settles into the words first and
+ * the face only gradually emerges, instead of pulling the eye away early.
+ */
+export const IMAGE_REVEAL_FRACTION = 1 / 3;
+
+/** Floor for the image reveal, in case a poem is too short for the fraction to read as gradual. */
+const MIN_IMAGE_REVEAL_MS = TEXT_START_DELAY_MS;
+
+/** How long the relay video's opacity takes to go from black to fully visible. */
+export function imageRevealDurationMs(totalReadingMs: number): number {
+  return Math.max(MIN_IMAGE_REVEAL_MS, Math.round(totalReadingMs * IMAGE_REVEAL_FRACTION));
+}
+
+/**
+ * The relay video's playback-rate divisor at `elapsedMs` since reveal —
+ * starts at STARTUP_SLOWDOWN_FACTOR and ramps linearly down to 1 by
+ * TEXT_START_DELAY_MS, so the video lands at full speed exactly as the
+ * reading starts ticking through words.
+ */
+export function startupSlowdownFactor(elapsedMs: number): number {
+  if (elapsedMs >= TEXT_START_DELAY_MS) return 1;
+  const t = elapsedMs / TEXT_START_DELAY_MS;
+  return STARTUP_SLOWDOWN_FACTOR - (STARTUP_SLOWDOWN_FACTOR - 1) * t;
+}
+
 function lettersOnly(text: string): string {
   return text.replace(/[^\p{L}]/gu, "");
 }

@@ -3,7 +3,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, act } from "@testing-library/react";
 import RelayVideoBackground from "./RelayVideoBackground";
 import styles from "./RelayVideoBackground.module.css";
-import { ENDING_HOLD_MS, ENDING_SLOWDOWN_FACTOR, TEXT_START_DELAY_MS } from "@/lib/timing";
+import {
+  ENDING_HOLD_MS,
+  ENDING_SLOWDOWN_FACTOR,
+  TEXT_START_DELAY_MS,
+  imageRevealDurationMs,
+} from "@/lib/timing";
 
 function mockVideoDuration(video: HTMLVideoElement, duration: number) {
   Object.defineProperty(video, "duration", { value: duration, configurable: true });
@@ -159,6 +164,29 @@ describe("RelayVideoBackground", () => {
     expect(video.playbackRate).toBeCloseTo(fullSpeedRate / 3);
   });
 
+  it("divides the playback rate by startingSlowFactor for a gradual opening (mirror of the ending)", () => {
+    const { container, rerender } = render(
+      <RelayVideoBackground {...baseProps} wordFraction={0} mode="auto" startingSlowFactor={1} />,
+    );
+    const video = container.querySelector("video")!;
+    mockVideoDuration(video, 20);
+    video.dispatchEvent(new Event("loadedmetadata"));
+
+    // Flush the duration/rate state updates the event listener queued.
+    rerender(
+      <RelayVideoBackground {...baseProps} wordFraction={0} mode="auto" startingSlowFactor={1} />,
+    );
+
+    const fullSpeedRate = video.playbackRate;
+    expect(fullSpeedRate).toBeGreaterThan(0);
+
+    rerender(
+      <RelayVideoBackground {...baseProps} wordFraction={0} mode="auto" startingSlowFactor={3} />,
+    );
+
+    expect(video.playbackRate).toBeCloseTo(fullSpeedRate / 3);
+  });
+
   it(
     "reserves a tail of footage for the closing slow motion instead of exhausting " +
       "the video at regular pace (regression: this caused the ending to freeze on the last frame)",
@@ -182,6 +210,26 @@ describe("RelayVideoBackground", () => {
       expect(video.playbackRate).toBeLessThan(naiveRate);
     },
   );
+
+  it("stretches the opacity fade-in to imageRevealDurationMs while revealing", () => {
+    const { container } = render(
+      <RelayVideoBackground {...baseProps} wordFraction={0} mode="auto" fading={false} />,
+    );
+    const video = container.querySelector("video")!;
+
+    expect(video.style.transitionDuration).toBe(
+      `${imageRevealDurationMs(baseProps.totalReadingMs)}ms, 220ms`,
+    );
+  });
+
+  it("steps aside once fading, leaving the CSS .faded rule's own transition in control", () => {
+    const { container } = render(
+      <RelayVideoBackground {...baseProps} wordFraction={0} mode="auto" fading={true} />,
+    );
+    const video = container.querySelector("video")!;
+
+    expect(video.style.transitionDuration).toBe("");
+  });
 
   it("does not render a video element (or block on preload) when there is no relay video yet", () => {
     const onReady = vi.fn();

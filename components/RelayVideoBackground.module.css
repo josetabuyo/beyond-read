@@ -14,9 +14,12 @@
   z-index: 0;
   filter: grayscale(0.35) brightness(0.55) contrast(0.95);
   opacity: 0;
-  transition:
-    opacity 1400ms ease,
-    filter 220ms ease;
+  /* Fallback duration only — while revealing, the opacity duration is
+     overridden inline with lib/timing.ts imageRevealDurationMs, so the
+     fade-in stretches across up to a third of the reading instead of this. */
+  transition-property: opacity, filter;
+  transition-timing-function: ease, ease;
+  transition-duration: 1400ms, 220ms;
 }
 
 .relay.revealed {

@@ -1,0 +1,21 @@
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--void);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.veil.covered {
+  opacity: 1;
+  pointer-events: auto;
+  /* Matches lib/timing.ts MENU_COVER_MS — the menu dissolves into black slowly. */
+  transition: opacity 1800ms ease;
+}
+
+.veil:not(.covered) {
+  /* Matches lib/timing.ts MENU_REVEAL_MS — lifts in step with the relay video's
+     own fade-in, so the two blend into a single soft reveal instead of a cut. */
+  transition: opacity 1800ms ease;
+}

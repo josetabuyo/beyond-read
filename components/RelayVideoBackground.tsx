@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ENDING_HOLD_MS, ENDING_SLOWDOWN_FACTOR, TEXT_START_DELAY_MS } from "@/lib/timing";
+import {
+  ENDING_HOLD_MS,
+  ENDING_SLOWDOWN_FACTOR,
+  TEXT_START_DELAY_MS,
+  imageRevealDurationMs,
+} from "@/lib/timing";
 import styles from "./RelayVideoBackground.module.css";
 
 const READY_TIMEOUT_MS = 6000;
@@ -23,6 +28,7 @@ export default function RelayVideoBackground({
   revealed,
   fading,
   endingSlowFactor = 1,
+  startingSlowFactor = 1,
   onReady,
 }: {
   relayUrl: string | null;
@@ -36,6 +42,8 @@ export default function RelayVideoBackground({
   fading: boolean;
   /** Divides the playback rate — 1 at regular pace, jumps to ENDING_SLOWDOWN_FACTOR the instant the last word is reached. */
   endingSlowFactor?: number;
+  /** Divides the playback rate — STARTUP_SLOWDOWN_FACTOR right after reveal, easing to 1 as the reading begins. */
+  startingSlowFactor?: number;
   onReady: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -129,14 +137,16 @@ export default function RelayVideoBackground({
 
   // endingSlowFactor is 1 at every regular pace and jumps straight to
   // ENDING_SLOWDOWN_FACTOR the instant the last word is reached — a hard cut
-  // into slow motion for the closing tail, never a gradual ramp. This only
-  // ever adjusts the rate, never seeks, so it never reintroduces the stutter.
+  // into slow motion for the closing tail, never a gradual ramp.
+  // startingSlowFactor is the opening mirror: it eases from
+  // STARTUP_SLOWDOWN_FACTOR down to 1 as the reading begins, a gradual ramp
+  // rather than a hard cut. Neither ever seeks, so neither reintroduces the stutter.
   useEffect(() => {
     const video = videoRef.current;
     if (video && playbackRate !== null) {
-      video.playbackRate = playbackRate / endingSlowFactor;
+      video.playbackRate = playbackRate / endingSlowFactor / startingSlowFactor;
     }
-  }, [playbackRate, endingSlowFactor]);
+  }, [playbackRate, endingSlowFactor, startingSlowFactor]);
 
   // Auto mode plays continuously at the stretched/compressed rate — no
   // per-word reseeking, which was causing a visible stutter/jump on every
@@ -177,6 +187,15 @@ export default function RelayVideoBackground({
     };
   }, [wordFraction, mode, duration]);
 
+  // Stretches the opacity fade-in across up to a third of the reading, so the
+  // face emerges gradually instead of pulling focus from the words early.
+  // Only applied while revealing — once fading (the ending), the CSS
+  // `.faded` rule's own transition takes over, so this inline override must
+  // step aside rather than clobber it.
+  const revealStyle = fading
+    ? undefined
+    : { transitionDuration: `${imageRevealDurationMs(totalReadingMs)}ms, 220ms` };
+
   return (
     <div className={styles.stack}>
       {relayUrl && (
@@ -185,6 +204,7 @@ export default function RelayVideoBackground({
           className={`${styles.relay} ${revealed ? styles.revealed : ""} ${
             fading ? styles.faded : ""
           } ${seeking ? styles.seeking : ""}`}
+          style={revealStyle}
           src={relayUrl}
           preload="auto"
           muted

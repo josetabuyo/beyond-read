@@ -3,12 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Poem } from "@/lib/tokenize";
-import { buildTimeline, finalWordSlowdownFactor, TEXT_START_DELAY_MS } from "@/lib/timing";
+import {
+  buildTimeline,
+  finalWordSlowdownFactor,
+  startupSlowdownFactor,
+  TEXT_START_DELAY_MS,
+} from "@/lib/timing";
 import { useCamera } from "./hooks/useCamera";
 import { useRecorder } from "./hooks/useRecorder";
 import { useKaraoke } from "./hooks/useKaraoke";
 import KaraokeText from "./KaraokeText";
 import RelayVideoBackground from "./RelayVideoBackground";
+import { useTransitionVeil } from "./TransitionVeil";
 import styles from "./ReaderStage.module.css";
 
 type Phase = "loading" | "reading" | "uploading" | "error";
@@ -21,6 +27,7 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
   const [revealed, setRevealed] = useState(false);
   const [textActive, setTextActive] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [startupElapsedMs, setStartupElapsedMs] = useState(0);
 
   const finishedRef = useRef(false);
   const startedRef = useRef(false);
@@ -28,6 +35,7 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
 
   const camera = useCamera();
   const recorder = useRecorder();
+  const veil = useTransitionVeil();
 
   const timeline = useMemo(() => buildTimeline(poem.words), [poem.words]);
 
@@ -72,8 +80,29 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
     recorder.start(camera.stream);
     setPhase("reading");
     setRevealed(true);
+    // Lifts the veil left over from the menu at the same moment the relay
+    // video starts its own fade-in, so the two blend into one soft reveal.
+    veil.reveal();
     window.setTimeout(() => setTextActive(true), TEXT_START_DELAY_MS);
-  }, [camera.stream, videoReady, phase, recorder]);
+  }, [camera.stream, videoReady, phase, recorder, veil]);
+
+  // Tracks real elapsed time since reveal so the relay video can ease out of
+  // its opening slow motion in step with the wall clock — not the word
+  // timeline, which hasn't started ticking yet during this window.
+  useEffect(() => {
+    if (!revealed) return;
+
+    let frame: number;
+    const start = performance.now();
+    const tick = () => {
+      const elapsed = performance.now() - start;
+      setStartupElapsedMs(elapsed);
+      if (elapsed < TEXT_START_DELAY_MS) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(frame);
+  }, [revealed]);
 
   // The reading holds on the last word for ENDING_HOLD_MS while the video
   // eases into slow motion and the screen fades to black. Stopping the
@@ -129,6 +158,7 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
     timeline.total > 0 ? timeline.starts[karaoke.index] / timeline.total : 0;
   const endingSlowFactor =
     poem.words.length > 0 ? finalWordSlowdownFactor(karaoke.index, poem.words.length) : 1;
+  const startingSlowFactor = startupSlowdownFactor(startupElapsedMs);
 
   return (
     <main className={styles.stage}>
@@ -140,6 +170,7 @@ export default function ReaderStage({ poem }: { poem: Poem }) {
         revealed={revealed}
         fading={finishing}
         endingSlowFactor={endingSlowFactor}
+        startingSlowFactor={startingSlowFactor}
         onReady={onVideoReady}
       />
 
