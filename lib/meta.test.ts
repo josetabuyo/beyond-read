@@ -7,7 +7,7 @@ import {
   claimRelayVideo,
   insertRecording,
   getRecord,
-  MAX_PER_POEM,
+  getMaxPerPoem,
   DELETE_GRACE_MS,
   MAX_AGE_MS,
 } from "./meta";
@@ -18,10 +18,13 @@ let tmpDir: string;
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "beyond-read-test-"));
   process.env.BEYOND_READ_DATA_DIR = tmpDir;
+  // Exercise the general multi-video mechanism regardless of the production default.
+  process.env.BEYOND_READ_MAX_PER_POEM = "5";
 });
 
 afterEach(() => {
   delete process.env.BEYOND_READ_DATA_DIR;
+  delete process.env.BEYOND_READ_MAX_PER_POEM;
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -103,7 +106,7 @@ describe("insertRecording eviction", () => {
 
   it("evicts the oldest active record once the per-poem cap is exceeded", async () => {
     const uploads = [];
-    for (let i = 0; i < MAX_PER_POEM; i++) {
+    for (let i = 0; i < getMaxPerPoem(); i++) {
       uploads.push(await upload("poem-d", (i + 1) * 1000));
     }
     const oldest = uploads[0];
@@ -116,6 +119,17 @@ describe("insertRecording eviction", () => {
 
     const storage = getStorage();
     await expect(storage.size(oldest.id)).rejects.toBeTruthy();
+  });
+
+  it("defaults to a buffer of 1 (only the latest recording survives) when unset", async () => {
+    delete process.env.BEYOND_READ_MAX_PER_POEM;
+    expect(getMaxPerPoem()).toBe(1);
+
+    const first = await upload("poem-g", 1000);
+    const second = await upload("poem-g", 2000);
+
+    expect(await getRecord(first.id)).toBeUndefined();
+    expect(await getRecord(second.id)).toBeDefined();
   });
 });
 

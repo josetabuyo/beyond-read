@@ -4,7 +4,12 @@ import { getStorage } from "./storage";
 import { videosDir } from "./storage/fs";
 import { getDataDir } from "./dataDir";
 
-export const MAX_PER_POEM = 5;
+/** Overridable via env: how many relay videos to keep in flight per poem. */
+export function getMaxPerPoem(): number {
+  return process.env.BEYOND_READ_MAX_PER_POEM
+    ? Number(process.env.BEYOND_READ_MAX_PER_POEM)
+    : 1;
+}
 export const MAX_INITIAL_VIEWS = 3;
 export const DELETE_GRACE_MS = 10 * 60_000;
 export const MAX_AGE_MS = 24 * 60 * 60_000;
@@ -149,8 +154,9 @@ export async function insertRecording(
       .filter((v) => v.poemId === poemId && v.remainingViews > 0)
       .sort((a, b) => a.createdAt - b.createdAt);
 
+    const maxPerPoem = getMaxPerPoem();
     let n = active.length;
-    while (n >= MAX_PER_POEM) {
+    while (n >= maxPerPoem) {
       const oldest = active.shift();
       if (!oldest) break;
       await storage.del(oldest.id);
