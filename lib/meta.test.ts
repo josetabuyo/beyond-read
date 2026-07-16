@@ -31,8 +31,8 @@ afterEach(() => {
 async function upload(poemId: string, now: number) {
   const storage = getStorage();
   const id = crypto.randomUUID();
-  await storage.put(id, Buffer.from("fake webm bytes"));
-  return insertRecording(poemId, id, `${id}.webm`, now);
+  const { url } = await storage.put(id, Buffer.from("fake webm bytes"));
+  return insertRecording(poemId, id, `${id}.webm`, url, now);
 }
 
 describe("claimRelayVideo", () => {
@@ -46,7 +46,8 @@ describe("claimRelayVideo", () => {
     await upload("poem-a", 2000);
 
     const claimed = await claimRelayVideo("poem-a", 3000);
-    expect(claimed).toBe(first.id);
+    expect(claimed?.id).toBe(first.id);
+    expect(claimed?.url).toBe(first.url);
   });
 
   it("decrements remainingViews at claim time, not stream time", async () => {
@@ -64,8 +65,8 @@ describe("claimRelayVideo", () => {
 
     await claimRelayVideo("solo", 2000);
     await claimRelayVideo("solo", 3000);
-    const claimedId = await claimRelayVideo("solo", 4000);
-    expect(claimedId).toBe(rec.id);
+    const claimed = await claimRelayVideo("solo", 4000);
+    expect(claimed?.id).toBe(rec.id);
 
     const record = await getRecord(rec.id);
     expect(record?.remainingViews).toBe(0);

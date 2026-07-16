@@ -3,7 +3,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import type { ReadableStream as NodeWebReadableStream } from "node:stream/web";
-import type { VideoStorage, StreamRange, VideoStreamResult } from "./index";
+import type { VideoStorage, StreamRange, VideoStreamResult, PutResult } from "./index";
 import { getDataDir } from "../dataDir";
 
 export function videosDir(): string {
@@ -19,13 +19,13 @@ async function ensureDir(): Promise<void> {
 }
 
 class FsVideoStorage implements VideoStorage {
-  async put(id: string, data: ReadableStream | Buffer): Promise<void> {
+  async put(id: string, data: ReadableStream | Buffer): Promise<PutResult> {
     await ensureDir();
     const dest = filePath(id);
 
     if (Buffer.isBuffer(data)) {
       await fsp.writeFile(dest, data);
-      return;
+      return { url: `/api/videos/${id}`, size: data.length };
     }
 
     const nodeStream = Readable.fromWeb(data as NodeWebReadableStream<Uint8Array>);
@@ -36,6 +36,9 @@ class FsVideoStorage implements VideoStorage {
       out.on("error", reject);
       nodeStream.on("error", reject);
     });
+
+    const stat = await fsp.stat(dest);
+    return { url: `/api/videos/${id}`, size: stat.size };
   }
 
   async getStream(id: string, range?: StreamRange): Promise<VideoStreamResult> {
@@ -62,6 +65,16 @@ class FsVideoStorage implements VideoStorage {
   async size(id: string): Promise<number> {
     const stat = await fsp.stat(filePath(id));
     return stat.size;
+  }
+
+  async listIds(): Promise<string[]> {
+    let files: string[] = [];
+    try {
+      files = await fsp.readdir(videosDir());
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    }
+    return files.filter((f) => f.endsWith(".webm")).map((f) => f.replace(/\.webm$/, ""));
   }
 }
 

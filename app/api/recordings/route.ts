@@ -29,15 +29,14 @@ export async function POST(request: NextRequest) {
   const id = crypto.randomUUID();
   const storage = getStorage();
 
-  await storage.put(id, request.body as ReadableStream);
+  const { url, size } = await storage.put(id, request.body as ReadableStream);
 
-  const size = await storage.size(id);
   if (size > MAX_BYTES) {
     await storage.del(id);
     return NextResponse.json({ error: "recording too large" }, { status: 413 });
   }
 
-  await insertRecording(poemId, id, `${id}.webm`);
+  await insertRecording(poemId, id, `${id}.webm`, url);
 
   return NextResponse.json({ id }, { status: 201 });
 }

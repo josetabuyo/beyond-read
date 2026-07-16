@@ -14,9 +14,9 @@ export async function POST(request: NextRequest) {
   }
 
   await sweep();
-  const videoId = await claimRelayVideo(poemId);
+  const claimed = await claimRelayVideo(poemId);
 
   return NextResponse.json({
-    relayVideoUrl: videoId ? `/api/videos/${videoId}` : null,
+    relayVideoUrl: claimed ? claimed.url : null,
   });
 }
