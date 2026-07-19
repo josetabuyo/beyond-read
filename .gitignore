@@ -36,6 +36,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# agent skill docs cached by `vercel integration add` (not project code)
+/.agents
+/.claude
+/skills-lock.json
+
 # beyond-read runtime data (ephemeral recordings, gitignored by design)
 /data
 
